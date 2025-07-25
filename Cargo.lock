@@ -61,7 +61,7 @@ dependencies = [
 
 [[package]]
 name = "facet-jsonschema"
-version = "0.23.23"
+version = "0.28.0"
 dependencies = [
  "cargo-husky",
  "facet",
