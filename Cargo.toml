@@ -17,7 +17,7 @@ categories = ["development-tools", "encoding"]
 
 [dependencies]
 facet-core = { version = "0.28.0" }
-facet-macros = { version = "0.28.0" }
+facet-macros = { version = "0.46.0" }
 
 [dev-dependencies]
 insta = "1.43.1"
