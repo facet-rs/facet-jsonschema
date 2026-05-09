@@ -2,7 +2,7 @@
 name = "facet-jsonschema"
 version = "0.23.23"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.90"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/facet-rs/facet-jsonschema"
 description = "Generate JSON Schema from Facet types. Provides a `to_string` function to get a JSON Schema representation as a string. Useful for reflection, introspection, serialization, and deserialization."
@@ -16,10 +16,8 @@ keywords = [
 categories = ["development-tools", "encoding"]
 
 [dependencies]
-facet-core = { version = "0.28.0" }
-facet-macros = { version = "0.28.0" }
+facet = { version = "0.46.0" }
 
 [dev-dependencies]
-insta = "1.43.1"
-facet = { version = "0.28.0" }
+insta = "1.47.2"
 cargo-husky = { version = "1.5.0", default-features = false, features = ["user-hooks"] }

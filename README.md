@@ -56,6 +56,7 @@ use facet_jsonschema::to_string;
 use facet::Facet;
 
 #[derive(Facet)]
+#[facet(facet_jsonschema::id = "https://example.com/test.schema.json")]
 struct TestStruct {
     /// String field
     string_field: String,
