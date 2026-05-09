@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.23.23](https://github.com/facet-rs/facet/compare/facet-jsonschema-v0.23.22...facet-jsonschema-v0.23.23) - 2025-07-03
+## [0.46.0](https://github.com/facet-rs/facet/compare/facet-jsonschema-v0.23.22...facet-jsonschema-v0.46.0) - 2025-07-03
 
 ### Other
 
