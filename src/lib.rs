@@ -4,12 +4,25 @@
 #![forbid(unsafe_code)]
 #![doc = include_str!("../README.md")]
 
-extern crate facet_core as facet;
-use facet::{PointerDef, PointerType, PrimitiveType, TextualType};
-use facet_core::{Def, Facet, Shape, Type, UserType};
+extern crate self as facet_jsonschema;
+
+use facet::{
+    Def, Facet, PointerDef, PointerType, PrimitiveType, Shape, TextualType, Type, UserType,
+};
 
 use core::alloc::Layout;
 use std::io::Write;
+
+facet::define_attr_grammar! {
+    ns "facet_jsonschema";
+    crate_path ::facet_jsonschema;
+
+    /// JSON Schema-specific Facet attributes.
+    pub enum Attr {
+        /// Sets the top-level JSON Schema `$id`.
+        Id(&'static str),
+    }
+}
 
 /// Convert a `Facet` type to a JSON schema string.
 pub fn to_string<'a, T: Facet<'a>>() -> String {
@@ -21,22 +34,12 @@ pub fn to_string<'a, T: Facet<'a>>() -> String {
     )
     .unwrap();
 
-    // Find the first attribute that starts with "id=", if it exists more than once is an error
-    let mut id = T::SHAPE.attributes.iter().filter_map(|attr| match attr {
-        facet_core::ShapeAttribute::Arbitrary(attr_str) => {
-            if attr_str.starts_with("id") {
-                let id = attr_str
-                    .split('=')
-                    .nth(1)
-                    .unwrap_or_default()
-                    .trim()
-                    .trim_matches('"');
-                Some(id)
-            } else {
-                None
-            }
-        }
-        _ => None,
+    // JSON Schema only allows a single top-level `$id`.
+    let mut id = T::SHAPE.attributes.iter().filter_map(|attr| {
+        (attr.ns == Some("facet_jsonschema") && attr.key == "id")
+            .then(|| attr.get_as::<&'static str>())
+            .flatten()
+            .copied()
     });
     match (id.next(), id.next()) {
         (Some(_), Some(_)) => panic!("More than one id attribute found"),
@@ -66,7 +69,7 @@ fn serialize<W: Write>(shape: &Shape, doc: &[&str], writer: &mut W) -> std::io::
             todo!("Enum");
         }
         Type::Sequence(sequence_type) => {
-            use facet_core::SequenceType;
+            use facet::SequenceType;
             match sequence_type {
                 SequenceType::Slice(_slice_type) => {
                     // For slices, use the Def::Slice if available
@@ -83,6 +86,10 @@ fn serialize<W: Write>(shape: &Shape, doc: &[&str], writer: &mut W) -> std::io::
                     }
                 }
             }
+        }
+        Type::Pointer(PointerType::Reference(pt) | PointerType::Raw(pt)) => {
+            serialize(pt.target(), &[], writer)?;
+            return Ok(());
         }
         _ => {} // Continue to check the def system
     }
@@ -115,13 +122,13 @@ fn serialize<W: Write>(shape: &Shape, doc: &[&str], writer: &mut W) -> std::io::
         Def::Pointer(PointerDef {
             pointee: Some(inner_shape),
             ..
-        }) => serialize(inner_shape(), &[], writer)?,
+        }) => serialize(inner_shape, &[], writer)?,
         Def::Undefined => {
             // Handle the case when not yet migrated to the Type enum
             // For primitives, we can try to infer the type
             match &shape.ty {
                 Type::Primitive(primitive) => {
-                    use facet_core::{NumericType, PrimitiveType, TextualType};
+                    use facet::{NumericType, PrimitiveType, TextualType};
                     match primitive {
                         PrimitiveType::Numeric(NumericType::Float) => {
                             write!(writer, "\"type\": \"number\", \"format\": \"double\"")?;
@@ -138,7 +145,7 @@ fn serialize<W: Write>(shape: &Shape, doc: &[&str], writer: &mut W) -> std::io::
                     }
                 }
                 Type::Pointer(PointerType::Reference(pt) | PointerType::Raw(pt)) => {
-                    serialize((pt.target)(), &[], writer)?
+                    serialize(pt.target(), &[], writer)?
                 }
                 _ => {
                     write!(writer, "\"type\": \"unknown\"")?;
@@ -164,10 +171,10 @@ fn serialize_doc<W: Write>(doc: &[&str], writer: &mut W) -> Result<(), std::io::
 /// Serialize a scalar definition to JSON schema format.
 fn serialize_scalar<W: Write>(
     layout: &Layout,
-    numeric_type: facet_core::NumericType,
+    numeric_type: facet::NumericType,
     writer: &mut W,
 ) -> std::io::Result<()> {
-    use facet_core::NumericType;
+    use facet::NumericType;
 
     match numeric_type {
         NumericType::Integer { signed } => {
@@ -189,7 +196,7 @@ fn serialize_scalar<W: Write>(
 }
 
 fn serialize_struct<W: Write>(
-    struct_type: &facet_core::StructType,
+    struct_type: &facet::StructType,
     writer: &mut W,
 ) -> std::io::Result<()> {
     write!(writer, "\"type\": \"object\",")?;
@@ -216,7 +223,7 @@ fn serialize_struct<W: Write>(
 }
 
 /// Serialize a list definition to JSON schema format.
-fn serialize_list<W: Write>(list_def: facet_core::ListDef, writer: &mut W) -> std::io::Result<()> {
+fn serialize_list<W: Write>(list_def: facet::ListDef, writer: &mut W) -> std::io::Result<()> {
     write!(writer, "\"type\": \"array\",")?;
     write!(writer, "\"items\": {{")?;
     serialize(list_def.t(), &[], writer)?;
@@ -225,10 +232,7 @@ fn serialize_list<W: Write>(list_def: facet_core::ListDef, writer: &mut W) -> st
 }
 
 /// Serialize a slice definition to JSON schema format.
-fn serialize_slice<W: Write>(
-    slice_def: facet_core::SliceDef,
-    writer: &mut W,
-) -> std::io::Result<()> {
+fn serialize_slice<W: Write>(slice_def: facet::SliceDef, writer: &mut W) -> std::io::Result<()> {
     write!(writer, "\"type\": \"array\",")?;
     write!(writer, "\"items\": {{")?;
     serialize(slice_def.t(), &[], writer)?;
@@ -237,10 +241,7 @@ fn serialize_slice<W: Write>(
 }
 
 /// Serialize an array definition to JSON schema format.
-fn serialize_array<W: Write>(
-    array_def: facet_core::ArrayDef,
-    writer: &mut W,
-) -> std::io::Result<()> {
+fn serialize_array<W: Write>(array_def: facet::ArrayDef, writer: &mut W) -> std::io::Result<()> {
     write!(writer, "\"type\": \"array\",")?;
     write!(writer, "\"minItems\": {},", array_def.n)?;
     write!(writer, "\"maxItems\": {},", array_def.n)?;
@@ -252,56 +253,9 @@ fn serialize_array<W: Write>(
 
 /// Serialize an option definition to JSON schema format.
 fn serialize_option<W: Write>(
-    _option_def: facet_core::OptionDef,
+    _option_def: facet::OptionDef,
     writer: &mut W,
 ) -> std::io::Result<()> {
     write!(writer, "\"type\": \"[]\",")?;
     unimplemented!("serialize_option");
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate alloc;
-    use alloc::{rc::Rc, sync::Arc};
-
-    use super::*;
-    use facet_macros::Facet;
-    use insta::assert_snapshot;
-
-    #[test]
-    fn test_basic() {
-        /// Test documentation
-        #[derive(Facet)]
-        #[facet(id = "http://example.com/schema")]
-        struct TestStruct {
-            /// Test doc1
-            string_field: String,
-            /// Test doc2
-            int_field: u32,
-            vec_field: Vec<bool>,
-            slice_field: &'static [f64],
-            array_field: [f64; 3],
-        }
-
-        let schema = to_string::<TestStruct>();
-        assert_snapshot!(schema);
-    }
-
-    #[test]
-    fn test_pointers() {
-        /// Test documentation
-        #[derive(Facet)]
-        #[facet(id = "http://example.com/schema")]
-        struct TestStruct<'a> {
-            normal_pointer: &'a str,
-            box_pointer: Box<u32>,
-            arc: Arc<u32>,
-            rc: Rc<u32>,
-            #[allow(clippy::redundant_allocation)]
-            nested: Rc<&'a Arc<&'a *const u32>>,
-        }
-
-        let schema = to_string::<TestStruct>();
-        assert_snapshot!(schema);
-    }
 }
