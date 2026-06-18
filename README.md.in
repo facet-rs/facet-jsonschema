@@ -1,23 +1,15 @@
+> [!IMPORTANT]
+> This repository has moved into the Facet monorepo and is no longer the active
+> JSON Schema implementation.
 
-This module provides functionality to generate JSON Schema from Facet types.
+Use [`facet-json-schema`](https://crates.io/crates/facet-json-schema) from
+[`facet-rs/facet`](https://github.com/facet-rs/facet/tree/main/facet-json-schema)
+instead.
 
-The main function is `to_string`, which takes a Facet type and returns its JSON Schema representation as a string.
+The replacement crate has a slightly different package name:
 
-## Example
+- old crate: `facet-jsonschema`
+- new crate: `facet-json-schema`
+- Rust module path: `facet_json_schema`
 
-```rust
-use facet_jsonschema::to_string;
-use facet::Facet;
-
-#[derive(Facet)]
-#[facet(facet_jsonschema::id = "https://example.com/test.schema.json")]
-struct TestStruct {
-    /// String field
-    string_field: String,
-    /// Integer field
-    int_field: u32,
-}
-
-let schema = to_string::<TestStruct>();
-println!("JSON Schema: {schema}");
-```
+After this redirect lands, this repository will be archived.
